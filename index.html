@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Calculation Selector</title>
+        <link rel="stylesheet" href="styles.css">
+    </head>
+
+    <body>
+        <div class="container">
+            <select id="calculationDropdown" onchange="displayCalculationName()">
+                <option value="">Select a Calculation</option>
+                <!-- Options will be added here by JavaScript -->
+            </select>
+            <div id="selectedCalculationName"></div>
+        </div>
+        <div id="questionsContainer"></div>
+        <div id="outputsContainer"></div>
+        <div id="calculationDescriptionContainer"></div>
+        <!-- Add this section to your existing HTML -->
+        <div id="resultsContainer">
+            <h3>Results:</h3>
+            <div id="globalScoreResult"></div>
+            <div id="physicalScaleScoreResult"></div>
+            <div id="psychologicalScaleScoreResult"></div>
+        </div>
+        <div id="pss4Result"></div>
+        <div id="totalScoreResult"></div>
+        <div id="ageResult"></div>
+
+        <button onclick="onCalculateResults()">Calculate Results</button>
+
+
+        <script src="script.js"></script>
+    </body>
+
+</html>
