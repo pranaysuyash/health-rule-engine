@@ -171,6 +171,8 @@ function processOutputs(calculationId, userAnswers) {
     // return {
     //   AGE: age,
     // };
+  } else if (calculationId === 'asrs') {
+    results = scoreASRS(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -235,62 +237,6 @@ function scorePSS4(userAnswers) {
   return { totalScore: totalScore };
 }
 
-// function calculateAgeFromDate(givenDate) {
-//   console.log('Input date:', givenDate);
-
-//   const birthDate = new Date(givenDate);
-//   // Ensure there are 3 parts (year, month, day)
-//   // if (dateParts.length === 3) {
-//   const year = birthDate.getFullYear();
-//   const month = birthDate.getMonth(); // Months are 0-indexed in JavaScript Date
-//   const day = birthDate.getDate();
-
-//   // Create a new date object
-
-//   console.log('Birth date:', birthDate);
-//   // const birthDate = calculateDOBFromDate(givenDate);
-//   const currentDate = new Date();
-//   console.log('curr', currentDate);
-//   console.log('birth', birthDate);
-//   let age = currentDate.getFullYear() - birthDate.getFullYear();
-//   const monthDifference = currentDate.getMonth() - birthDate.getMonth();
-//   console.log('Age:', age);
-//   console.log('difference:', monthDifference);
-//   if (
-//     monthDifference < 0 ||
-//     (monthDifference === 0 && currentDate.getDate() < birthDate.getDate())
-//   ) {
-//     age--;
-//   }
-//   return { age };
-//   // }
-// }
-// This function will calculate the age correctly based on the input format 'DD/MM/YYYY'
-// function calculateAgeFromDob(dob) {
-//   const dateParts = dob.split('/');
-
-//   if (dateParts.length === 3) {
-//     const day = parseInt(dateParts[0], 10);
-//     const month = parseInt(dateParts[1], 10) - 1; // JavaScript months are 0-indexed
-//     const year = parseInt(dateParts[2], 10);
-
-//     const birthDate = new Date(year, month, day);
-//     const currentDate = new Date();
-//     let age = currentDate.getFullYear() - birthDate.getFullYear();
-
-//     if (
-//       currentDate.getMonth() < month ||
-//       (currentDate.getMonth() === month && currentDate.getDate() < day)
-//     ) {
-//       age--;
-//     }
-
-//     return age;
-//   } else {
-//     console.error('Invalid DOB format:', dob);
-//     return null;
-//   }
-// }
 function calculateAgeFromDate(dateString) {
   // Split the date string by '/' to match the 'DD/MM/YYYY' format
   const parts = dateString.split('-');
@@ -313,6 +259,60 @@ function calculateAgeFromDate(dateString) {
   }
 }
 
+function scoreASRS(userAnswers) {
+  const inattentiveItems = [
+    'Q01',
+    'Q02',
+    'Q03',
+    'Q04',
+    'Q07',
+    'Q08',
+    'Q09',
+    'Q10',
+    'Q11',
+  ];
+  const motorHyperactiveItems = ['Q05', 'Q06', 'Q12', 'Q13', 'Q14'];
+  const verbalHyperactiveItems = ['Q15', 'Q16', 'Q17', 'Q18'];
+
+  let inattentiveScore = 0;
+  let motorHyperactiveScore = 0;
+  let verbalHyperactiveScore = 0;
+
+  // Calculate scores for each item
+  for (const [key, value] of Object.entries(userAnswers)) {
+    // Adjusting the scoring based on the ASRS rules
+    let adjustedValue = 0;
+    if (
+      ['Q01', 'Q02', 'Q03', 'Q09', 'Q12', 'Q16', 'Q18'].includes(key) &&
+      value >= 2
+    ) {
+      adjustedValue = 1; // For these items, 'sometimes' (2) or higher counts as 1 point
+    } else if (value >= 3) {
+      adjustedValue = 1; // For the rest, 'often' (3) or 'very often' (4) counts as 1 point
+    }
+
+    if (inattentiveItems.includes(key)) {
+      inattentiveScore += adjustedValue;
+    } else if (motorHyperactiveItems.includes(key)) {
+      motorHyperactiveScore += adjustedValue;
+    } else if (verbalHyperactiveItems.includes(key)) {
+      verbalHyperactiveScore += adjustedValue;
+    }
+  }
+
+  // Calculate the total score
+  const totalScore =
+    inattentiveScore + motorHyperactiveScore + verbalHyperactiveScore;
+
+  return {
+    calculationId: 'asrs', // Add this line
+    totalScore: totalScore,
+    inattentiveScore: inattentiveScore,
+    motorHyperactiveScore: motorHyperactiveScore,
+    verbalHyperactiveScore: verbalHyperactiveScore,
+  };
+}
+
 function defaultScoring(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
@@ -333,6 +333,17 @@ function displayResults(results) {
     document.getElementById(
       'ageResult'
     ).textContent = `Age: ${results.AGE} years and ${results.monthDifference} months`;
+  }
+  if (results.calculationId === 'asrs') {
+    // Display ASRS scores
+    document.getElementById('totalScoreResult').textContent =
+      'Total ASRS Score: ' + results.totalScore;
+    document.getElementById('inattentiveScoreResult').textContent =
+      'Inattentive Score: ' + results.inattentiveScore;
+    document.getElementById('motorHyperactiveScoreResult').textContent =
+      'Motor Hyperactive/Impulsive Score: ' + results.motorHyperactiveScore;
+    document.getElementById('verbalHyperactiveScoreResult').textContent =
+      'Verbal Hyperactive/Impulsive Score: ' + results.verbalHyperactiveScore;
   } else {
     document.getElementById('globalScoreResult').textContent =
       'Global Score: ' + results.globalScore;
