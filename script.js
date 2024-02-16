@@ -20,10 +20,17 @@ window.onload = async function () {
 function populateDropdown(calculations) {
   const dropdown = document.getElementById('calculationDropdown');
   calculations.forEach((calculation) => {
-    const option = document.createElement('option');
-    option.value = calculation.calculation_id;
-    option.textContent = calculation.calculation_id;
-    dropdown.appendChild(option);
+    if (
+      !['chc_preop_brochure_triage', 'femmes_enceintes_triage'].includes(
+        calculation.calculation_id
+      )
+    ) {
+      const option = document.createElement('option');
+      option.value = calculation.calculation_id;
+      option.textContent =
+        calculation.calculation_name.en || calculation.calculation_id;
+      dropdown.appendChild(option);
+    }
   });
 }
 
@@ -32,6 +39,13 @@ let currentCalculation = null; // Global variable to store the current calculati
 function displayCalculationName() {
   const dropdown = document.getElementById('calculationDropdown');
   const selectedId = dropdown.value;
+
+  // Clear previous calculation data
+  document.getElementById('selectedCalculationName').textContent = '';
+  document.getElementById('questionsContainer').innerHTML = '';
+  document.getElementById('calculationDescriptionContainer').innerHTML = '';
+  document.getElementById('resultsContainer').style.display = 'none';
+
   fetchCalculations().then((calculations) => {
     currentCalculation = calculations.find(
       (calculation) => calculation.calculation_id === selectedId
@@ -44,6 +58,7 @@ function displayCalculationName() {
         currentCalculation.calculation_blueprint.input_definition
       );
       displayCalculationDescription(currentCalculation.calculation_description);
+      document.getElementById('resultsContainer').style.display = 'block';
     }
   });
 }
@@ -68,6 +83,7 @@ function displayQuestions(inputDefinition) {
     label.htmlFor = question.id;
 
     let input;
+    let valueDisplay; // Element to display the slider's value
     if (question.input_type.allowed_answers) {
       // Dropdown for questions with predefined allowed answers
       input = document.createElement('select');
@@ -79,13 +95,38 @@ function displayQuestions(inputDefinition) {
         input.appendChild(option);
       });
     } else if (question.input_type.range) {
-      // Slider or number input for range-based questions
+      // Number input for range-based questions
       input = document.createElement('input');
-      input.type = 'range'; // or 'number'
+      input.type = 'number';
       input.id = question.id;
-      input.min = question.input_type.range.min.value;
-      input.max = question.input_type.range.max.value;
-      // Additional attributes like step can be added based on requirements
+      input.min = question.id === 'weight' ? 0 : 0;
+      input.max = question.id === 'weight' ? 300 : 200;
+
+      // Determine the unit based on the question id
+      let unit = question.id === 'weight' ? 'kg' : 'cm';
+      // Create a span to display the number input's value with unit
+      valueDisplay = document.createElement('span');
+
+      valueDisplay.id = question.id + '_value';
+      valueDisplay.textContent = '0 ' + unit; // Initialize with 0 and the unit
+
+      // Append the label and input
+      questionDiv.appendChild(label);
+      questionDiv.appendChild(input);
+      questionDiv.appendChild(valueDisplay);
+      // Event listener to update the value display when the number value changes
+      input.addEventListener('input', function () {
+        // Correct the value if it's out of bounds
+        if (this.valueAsNumber < this.min) {
+          this.value = this.min;
+        } else if (this.valueAsNumber > this.max) {
+          this.value = this.max;
+        }
+        // Update the display span with the current value and unit
+        valueDisplay.textContent = this.value + ' ' + unit;
+      });
+      // Append the value display span after the number input
+      // questionDiv.appendChild(valueDisplay);
     } else {
       // Regular input for other types
       input = document.createElement('input');
@@ -173,6 +214,10 @@ function processOutputs(calculationId, userAnswers) {
     // };
   } else if (calculationId === 'asrs') {
     results = scoreASRS(userAnswers);
+  } else if (calculationId === 'bmi') {
+    results = calculateBMI(userAnswers);
+  } else if (calculationId === 'bwcs') {
+    results = scoreBWCS(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -313,6 +358,52 @@ function scoreASRS(userAnswers) {
   };
 }
 
+function calculateBMI(userAnswers) {
+  let weight = userAnswers.weight; // Assuming weight is in kilograms
+  let height = userAnswers.height / 100; // Convert height from cm to meters
+
+  let bmi = weight / (height * height);
+
+  // Categorize BMI
+  let category = '';
+  if (bmi < 16.5) {
+    category = 'Severely underweight';
+  } else if (bmi < 18.5) {
+    category = 'Underweight';
+  } else if (bmi < 25) {
+    category = 'Normal weight';
+  } else if (bmi < 30) {
+    category = 'Overweight';
+  } else {
+    category = 'Obesity';
+  }
+
+  return {
+    calculationId: 'bmi',
+    bmi: bmi.toFixed(2), // Round to 2 decimal places
+    category: category,
+  };
+}
+
+function scoreBWCS(userAnswers) {
+  // Initialize the total score
+  let totalScore = 0;
+
+  // Sum the scores for each BWCS question
+  for (let i = 1; i <= 5; i++) {
+    const questionKey = `Q${i.toString().padStart(2, '0')}`;
+    const answerValue = parseInt(userAnswers[questionKey], 10);
+    // Ensure that non-numeric answers are treated as 0
+    totalScore += isNaN(answerValue) ? 0 : answerValue;
+  }
+
+  // Return the total score
+  return {
+    calculationId: 'bwcs', // Identifier for the BWCS calculation
+    totalScore: totalScore, // The total score for BWCS
+  };
+}
+
 function defaultScoring(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
@@ -325,6 +416,11 @@ function defaultScoring(userAnswers) {
 
 function displayResults(results) {
   console.log('Results', results);
+
+  // Clear previous results
+  document.getElementById('bmiResult').innerHTML = '';
+  document.getElementById('totalScoreResult').innerHTML = '';
+  document.getElementById('ageResult').innerHTML = '';
   if ('totalScore' in results) {
     document.getElementById('totalScoreResult').textContent =
       'Total Score: ' + results.totalScore;
@@ -344,6 +440,13 @@ function displayResults(results) {
       'Motor Hyperactive/Impulsive Score: ' + results.motorHyperactiveScore;
     document.getElementById('verbalHyperactiveScoreResult').textContent =
       'Verbal Hyperactive/Impulsive Score: ' + results.verbalHyperactiveScore;
+  } else if (results.calculationId === 'bmi') {
+    console.log(results.calculationId);
+    document.getElementById('bmiResult').textContent =
+      'BMI: ' + results.bmi + ' (' + results.category + ')';
+  } else if (results.calculationId === 'bwcs') {
+    document.getElementById('bwcsResult').textContent =
+      'BWCS Total Score: ' + results.totalScore;
   } else {
     document.getElementById('globalScoreResult').textContent =
       'Global Score: ' + results.globalScore;
@@ -359,28 +462,6 @@ function calculateScaleScore(answers) {
   return score.toFixed(2); // Rounding to two decimal places for precision
 }
 
-// function getUserAnswers(inputDefinition) {
-//   const answers = {};
-//   inputDefinition.forEach((question) => {
-//     const answerElement = document.getElementById(question.id);
-//     console.log('answers from getuseranswers', answers[question.id]);
-//     if (answerElement) {
-//       if (question.input_type.type === 'date') {
-//         const ageResult = calculateAgeFromDate(answerElement.value);
-//         //   // Directly pass the date string to the calculateYearDifference function
-//         answers[question.id] = ageResult.age;
-//         console.log('answers from getuseranswers', answers[question.id]);
-//       } else {
-//         // Handle other types of inputs (like number, text)
-//         answers[question.id] = parseInt(answerElement.value, 10);
-//         console.log('answers from getuseranswers', answers[question.id]);
-//       }
-//     } else {
-//       console.error('Answer element not found for question ID:', question.id);
-//     }
-//   });
-//   return answers;
-// }
 function getUserAnswers(inputDefinition) {
   const answers = {};
   inputDefinition.forEach((question) => {
