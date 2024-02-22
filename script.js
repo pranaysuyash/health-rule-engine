@@ -20,11 +20,12 @@ window.onload = async function () {
 function populateDropdown(calculations) {
   const dropdown = document.getElementById('calculationDropdown');
   calculations.forEach((calculation) => {
-    if (
-      !['chc_preop_brochure_triage', 'femmes_enceintes_triage'].includes(
-        calculation.calculation_id
-      )
-    ) {
+    // if (
+    //   !['chc_preop_brochure_triage', 'femmes_enceintes_triage'].includes(
+    //     calculation.calculation_id
+    //   )
+    // )
+    {
       const option = document.createElement('option');
       option.value = calculation.calculation_id;
       option.textContent =
@@ -47,9 +48,11 @@ function displayCalculationName() {
   document.getElementById('resultsContainer').style.display = 'none';
 
   fetchCalculations().then((calculations) => {
+    console.log('Selected calculation ID:', selectedId);
     currentCalculation = calculations.find(
       (calculation) => calculation.calculation_id === selectedId
     );
+    console.log('Fetched calculation:', currentCalculation);
     if (currentCalculation) {
       const nameDisplay = document.getElementById('selectedCalculationName');
       nameDisplay.textContent = currentCalculation.calculation_name.en;
@@ -59,6 +62,8 @@ function displayCalculationName() {
       );
       displayCalculationDescription(currentCalculation.calculation_description);
       document.getElementById('resultsContainer').style.display = 'block';
+    } else {
+      console.error('Calculation data for selected ID not found:', selectedId);
     }
   });
 }
@@ -80,6 +85,7 @@ function displayQuestions(inputDefinition) {
 
     const label = document.createElement('label');
     label.textContent = question.label.en;
+
     label.htmlFor = question.id;
 
     let input;
@@ -89,10 +95,12 @@ function displayQuestions(inputDefinition) {
       input = document.createElement('select');
       input.id = question.id;
       question.input_type.allowed_answers.forEach((answer) => {
-        const option = document.createElement('option');
-        option.value = answer.value;
-        option.textContent = answer.label.en;
-        input.appendChild(option);
+        if (answer.label && answer.label.en) {
+          const option = document.createElement('option');
+          option.value = answer.value;
+          option.textContent = answer.label.en;
+          input.appendChild(option);
+        }
       });
     } else if (question.input_type.range) {
       // Number input for range-based questions
@@ -218,6 +226,10 @@ function processOutputs(calculationId, userAnswers) {
     results = calculateBMI(userAnswers);
   } else if (calculationId === 'bwcs') {
     results = scoreBWCS(userAnswers);
+  } else if (calculationId === 'audit') {
+    results = scoreAUDIT(userAnswers);
+  } else if (calculationId === 'beck') {
+    results = scoreBDI_II(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -267,9 +279,10 @@ function scoreAcroQoL(userAnswers) {
   ).toFixed(2);
 
   return {
-    globalScore: globalScore,
-    physicalScaleScore: physicalScaleScore,
-    psychologicalScaleScore: psychologicalScaleScore,
+    calculationId: 'acro',
+    acroglobalScore: globalScore,
+    acrophysicalScaleScore: physicalScaleScore,
+    acropsychologicalScaleScore: psychologicalScaleScore,
   };
 }
 
@@ -277,9 +290,9 @@ function scorePSS4(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
   );
-  let totalScore = answersArray.reduce((acc, val) => acc + val, 0);
+  let pss4totalScore = answersArray.reduce((acc, val) => acc + val, 0);
 
-  return { totalScore: totalScore };
+  return { calculationId: 'pss_4', pss4totalScore: pss4totalScore };
 }
 
 function calculateAgeFromDate(dateString) {
@@ -346,12 +359,12 @@ function scoreASRS(userAnswers) {
   }
 
   // Calculate the total score
-  const totalScore =
+  const asrstotalScore =
     inattentiveScore + motorHyperactiveScore + verbalHyperactiveScore;
 
   return {
     calculationId: 'asrs', // Add this line
-    totalScore: totalScore,
+    asrstotalScore: asrstotalScore,
     inattentiveScore: inattentiveScore,
     motorHyperactiveScore: motorHyperactiveScore,
     verbalHyperactiveScore: verbalHyperactiveScore,
@@ -384,6 +397,59 @@ function calculateBMI(userAnswers) {
     category: category,
   };
 }
+// function scoreAUDIT(userAnswers) {
+//   let totalScore = 0;
+//   // Questions 1 to 8: Scored from 0 to 4
+//   for (let i = 1; i <= 8; i++) {
+//     const questionKey = `Q${i}`;
+//     totalScore += parseInt(userAnswers[questionKey], 10);
+//   }
+//   // Questions 9 and 10: Scored as 0, 2, or 4
+//   for (let i = 9; i <= 10; i++) {
+//     const questionKey = `Q${i}`;
+//     const answerValue = parseInt(userAnswers[questionKey], 10);
+//     if (answerValue === 1) {
+//       totalScore += 2;
+//     } else if (answerValue === 2) {
+//       totalScore += 4;
+//     }
+//   }
+//   return { auditScore: totalScore };
+// }
+function scoreAUDIT(userAnswers) {
+  let audittotalScore = 0;
+  let consumptionScore = 0;
+  let dependenceScore = 0;
+  let problemsScore = 0;
+
+  // Calculate total and individual scores
+  for (let i = 1; i <= 10; i++) {
+    const questionKey = `AUDIT_Q0${i}`;
+    const answerValue = parseInt(userAnswers[questionKey], 10);
+
+    audittotalScore +=
+      i <= 8 ? answerValue : answerValue > 0 ? 2 + 2 * (answerValue - 1) : 0;
+
+    if (i <= 3) {
+      // Consumption score
+      consumptionScore += answerValue;
+    } else if (i >= 4 && i <= 6) {
+      // Dependence score
+      dependenceScore += answerValue;
+    } else if (i >= 7) {
+      // Problems score
+      problemsScore += answerValue > 0 ? 2 + 2 * (answerValue - 1) : 0;
+    }
+  }
+
+  return {
+    calculationId: 'audit',
+    auditScore: audittotalScore,
+    consumptionScore: consumptionScore,
+    dependenceScore: dependenceScore,
+    problemsScore: problemsScore,
+  };
+}
 
 function scoreBWCS(userAnswers) {
   // Initialize the total score
@@ -404,6 +470,37 @@ function scoreBWCS(userAnswers) {
   };
 }
 
+function scoreBDI_II(userAnswers) {
+  let bditotalScore = 0;
+
+  // Summing up the scores for all 21 questions
+  for (let i = 1; i <= 21; i++) {
+    const questionKey = `Q${i.toString().padStart(2, '0')}`; // Updated to match question IDs
+    const answer = parseInt(userAnswers[questionKey], 10);
+    if (!isNaN(answer)) {
+      bditotalScore += answer;
+    }
+  }
+
+  // Categorizing the total score
+  let depressionLevel = '';
+  if (bditotalScore <= 13) {
+    depressionLevel = 'Minimal depression';
+  } else if (bditotalScore <= 19) {
+    depressionLevel = 'Mild depression';
+  } else if (bditotalScore <= 28) {
+    depressionLevel = 'Moderate depression';
+  } else {
+    depressionLevel = 'Severe depression';
+  }
+
+  return {
+    calculationId: 'beck',
+    bditotalScore: bditotalScore,
+    depressionLevel: depressionLevel,
+  };
+}
+
 function defaultScoring(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
@@ -418,9 +515,13 @@ function displayResults(results) {
   console.log('Results', results);
 
   // Clear previous results
-  document.getElementById('bmiResult').innerHTML = '';
-  document.getElementById('totalScoreResult').innerHTML = '';
-  document.getElementById('ageResult').innerHTML = '';
+  // document.getElementById('auditScoreResult').innerHTML = '';
+  // document.getElementById('consumptionScoreResult').innerHTML = '';
+  // document.getElementById('dependenceScoreResult').innerHTML = '';
+  // document.getElementById('problemsScoreResult').innerHTML = '';
+  // document.getElementById('bmiResult').innerHTML = '';
+  // document.getElementById('totalScoreResult').innerHTML = '';
+  // document.getElementById('ageResult').innerHTML = '';
   if ('totalScore' in results) {
     document.getElementById('totalScoreResult').textContent =
       'Total Score: ' + results.totalScore;
@@ -429,17 +530,20 @@ function displayResults(results) {
     document.getElementById(
       'ageResult'
     ).textContent = `Age: ${results.AGE} years and ${results.monthDifference} months`;
-  }
-  if (results.calculationId === 'asrs') {
+  } else if (results.calculationId === 'asrs') {
     // Display ASRS scores
-    document.getElementById('totalScoreResult').textContent =
-      'Total ASRS Score: ' + results.totalScore;
+    document.getElementById('asrstotalScoreResult').textContent =
+      'Total ASRS Score: ' + results.asrstotalScore;
     document.getElementById('inattentiveScoreResult').textContent =
       'Inattentive Score: ' + results.inattentiveScore;
     document.getElementById('motorHyperactiveScoreResult').textContent =
       'Motor Hyperactive/Impulsive Score: ' + results.motorHyperactiveScore;
     document.getElementById('verbalHyperactiveScoreResult').textContent =
       'Verbal Hyperactive/Impulsive Score: ' + results.verbalHyperactiveScore;
+  } else if (results.calculationId === 'pss_4') {
+    // Display ASRS scores
+    document.getElementById('pss4Result').textContent =
+      'Total PSS_4 Score: ' + results.pss4totalScore;
   } else if (results.calculationId === 'bmi') {
     console.log(results.calculationId);
     document.getElementById('bmiResult').textContent =
@@ -447,13 +551,29 @@ function displayResults(results) {
   } else if (results.calculationId === 'bwcs') {
     document.getElementById('bwcsResult').textContent =
       'BWCS Total Score: ' + results.totalScore;
-  } else {
-    document.getElementById('globalScoreResult').textContent =
-      'Global Score: ' + results.globalScore;
-    document.getElementById('physicalScaleScoreResult').textContent =
-      'Physical Scale Score: ' + results.physicalScaleScore;
-    document.getElementById('psychologicalScaleScoreResult').textContent =
-      'Psychological Scale Score: ' + results.psychologicalScaleScore;
+  } else if (results.calculationId === 'audit') {
+    // Display AUDIT scores
+    document.getElementById('auditScoreResult').textContent =
+      'Total Audit Score: ' + results.auditScore;
+    document.getElementById('consumptionScoreResult').textContent =
+      'Consumption Score: ' + results.consumptionScore;
+    document.getElementById('dependenceScoreResult').textContent =
+      'Dependence Score: ' + results.dependenceScore;
+    document.getElementById('problemsScoreResult').textContent =
+      'Problems Score: ' + results.problemsScore;
+  } else if (results.calculationId === 'beck') {
+    // Display AUDIT scores
+    document.getElementById('bdiIIScore').textContent =
+      'Total BDI Score: ' + results.bditotalScore;
+    document.getElementById('bdiIIDepressionLevel').textContent =
+      'Depression level: ' + results.depressionLevel;
+  } else if (results.calculationId === 'acro') {
+    document.getElementById('acroglobalScoreResult').textContent =
+      'Global Score: ' + results.acroglobalScore;
+    document.getElementById('acrophysicalScaleScoreResult').textContent =
+      'Physical Scale Score: ' + results.acrophysicalScaleScore;
+    document.getElementById('acropsychologicalScaleScoreResult').textContent =
+      'Psychological Scale Score: ' + results.acropsychologicalScaleScore;
   }
 }
 function calculateScaleScore(answers) {
