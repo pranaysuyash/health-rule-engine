@@ -230,6 +230,16 @@ function processOutputs(calculationId, userAnswers) {
     results = scoreAUDIT(userAnswers);
   } else if (calculationId === 'beck') {
     results = scoreBDI_II(userAnswers);
+  } else if (calculationId === 'blcs') {
+    results = scoreBLCS(userAnswers);
+  } else if (calculationId === 'cade_q_sv') {
+    results = scoreCADE_Q_SV(userAnswers);
+  } else if (calculationId === 'caregiver_strain_index') {
+    results = scoreCSI(userAnswers);
+  } else if (calculationId === 'cat') {
+    results = scoreCAT(userAnswers);
+  } else if (calculationId === 'ccq') {
+    results = scoreCCQ(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -453,20 +463,20 @@ function scoreAUDIT(userAnswers) {
 
 function scoreBWCS(userAnswers) {
   // Initialize the total score
-  let totalScore = 0;
+  let bwcstotalScore = 0;
 
   // Sum the scores for each BWCS question
   for (let i = 1; i <= 5; i++) {
     const questionKey = `Q${i.toString().padStart(2, '0')}`;
     const answerValue = parseInt(userAnswers[questionKey], 10);
     // Ensure that non-numeric answers are treated as 0
-    totalScore += isNaN(answerValue) ? 0 : answerValue;
+    bwcstotalScore += isNaN(answerValue) ? 0 : answerValue;
   }
 
   // Return the total score
   return {
     calculationId: 'bwcs', // Identifier for the BWCS calculation
-    totalScore: totalScore, // The total score for BWCS
+    bwcstotalScore: bwcstotalScore, // The total score for BWCS
   };
 }
 
@@ -501,6 +511,222 @@ function scoreBDI_II(userAnswers) {
   };
 }
 
+function scoreBLCS(userAnswers) {
+  let blcsTotalScore = 0;
+
+  // Summing up the scores for all 4 questions
+  for (let i = 1; i <= 4; i++) {
+    const questionKey = `Q0${i}`;
+    blcsTotalScore += parseInt(userAnswers[questionKey] || 0, 10);
+  }
+
+  return {
+    calculationId: 'blcs',
+    blcsTotalScore: blcsTotalScore,
+  };
+}
+function scoreCADE_Q_SV(userAnswers) {
+  const correctAnswers = [
+    0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1,
+  ];
+  let cadetotalScore = 0;
+
+  for (let i = 1; i <= 20; i++) {
+    const questionKey = `Q${i.toString().padStart(2, '0')}`;
+    if (userAnswers[questionKey] === correctAnswers[i - 1]) {
+      cadetotalScore++;
+    }
+  }
+
+  return {
+    calculationId: 'cade_q_sv',
+    cadetotalScore: cadetotalScore,
+  };
+}
+function scoreCSI(userAnswers) {
+  let csiTotalScore = 0;
+  let missingData = false;
+
+  console.log('User Answers:', userAnswers);
+
+  for (let i = 1; i <= 13; i++) {
+    const questionKey = `CSI_Q${i.toString().padStart(2, '0')}`;
+    console.log(
+      'Question Key:',
+      questionKey,
+      'Value:',
+      userAnswers[questionKey]
+    );
+
+    // Check for missing data
+    if (userAnswers[questionKey] === undefined) {
+      missingData = true;
+      break;
+    }
+
+    // Add score for 'YES' answers
+    if (userAnswers[questionKey] === '1' || userAnswers[questionKey] === 1) {
+      csiTotalScore += 1;
+    }
+  }
+
+  // Handle missing data
+  if (missingData) {
+    console.error('Missing data: all questions must be answered.');
+    return {
+      calculationId: 'caregiver_strain_index',
+      csiTotalScore: 'Error: Missing data',
+    };
+  }
+
+  console.log('Calculated CSI Total Score:', csiTotalScore);
+
+  return {
+    calculationId: 'caregiver_strain_index',
+    csiTotalScore: csiTotalScore,
+  };
+}
+function scoreCAT(userAnswers) {
+  let totalScore = 0;
+  for (let key in userAnswers) {
+    if (userAnswers.hasOwnProperty(key)) {
+      totalScore += parseInt(userAnswers[key], 10);
+    }
+  }
+  return {
+    calculationId: 'cat',
+    catTotalScore: totalScore,
+  };
+}
+// function scoreCCQ(userAnswers) {
+//   const domainItems = {
+//     Symptoms: ['Q01', 'Q02', 'Q05', 'Q06'],
+//     FunctionalState: ['Q07', 'Q08', 'Q09', 'Q10'],
+//     MentalState: ['Q03', 'Q04'],
+//     TotalScore: [
+//       'Q01',
+//       'Q02',
+//       'Q03',
+//       'Q04',
+//       'Q05',
+//       'Q06',
+//       'Q07',
+//       'Q08',
+//       'Q09',
+//       'Q10',
+//     ],
+//   };
+
+//   let domainScores = {
+//     Symptoms: 0,
+//     FunctionalState: 0,
+//     MentalState: 0,
+//     TotalScore: 0,
+//   };
+
+//   let totalItemsCount = 0;
+
+//   for (let domain in domainItems) {
+//     let sum = 0;
+//     let itemCount = 0;
+
+//     domainItems[domain].forEach((item) => {
+//       let key = 'Q' + String(item).padStart(2, '0');
+//       let answerValue = userAnswers[key];
+//       if (answerValue === undefined) {
+//         answerValue = 0; // treat undefined answers as 0
+//       }
+//       sum += parseInt(answerValue);
+//       itemCount++;
+//     });
+
+//     if (itemCount >= (domain === 'MentalState' ? 2 : 3)) {
+//       domainScores[domain] = sum / itemCount;
+//     }
+
+//     totalItemsCount += itemCount;
+//     console.log(itemCount);
+//     domainScores['TotalScore'] += sum;
+//   }
+
+//   console.log(domainScores);
+//   if (totalItemsCount === 10) {
+//     domainScores['TotalScore'] /= totalItemsCount;
+//   } else {
+//     domainScores['TotalScore'] = undefined; // Or handle as needed
+//   }
+
+//   return {
+//     calculationId: 'ccq',
+//     ccqDomainScore: domainScores,
+//   };
+// }
+
+function scoreCCQ(userAnswers) {
+  const domainItems = {
+    Symptoms: ['Q01', 'Q02', 'Q05', 'Q06'],
+    FunctionalState: ['Q07', 'Q08', 'Q09', 'Q10'],
+    MentalState: ['Q03', 'Q04'],
+    // TotalScore: [
+    //   'Q01',
+    //   'Q02',
+    //   'Q03',
+    //   'Q04',
+    //   'Q05',
+    //   'Q06',
+    //   'Q07',
+    //   'Q08',
+    //   'Q09',
+    //   'Q10',
+    // ],
+  };
+
+  let domainScores = {
+    Symptoms: 0,
+    FunctionalState: 0,
+    MentalState: 0,
+    TotalScore: 0,
+  };
+
+  let totalItemsCount = 0;
+
+  for (let domain in domainItems) {
+    let sum = 0;
+    let itemCount = 0;
+
+    domainItems[domain].forEach((item) => {
+      let key = String(item).padStart(2, '0');
+      let answerValue =
+        userAnswers[key] !== undefined ? parseInt(userAnswers[key]) : 0;
+      sum += answerValue;
+
+      itemCount++;
+    });
+
+    domainScores[domain] = itemCount > 0 ? sum / itemCount : 0;
+
+    totalItemsCount += itemCount;
+    domainScores['TotalScore'] += sum;
+  }
+
+  domainScores['TotalScore'] /= totalItemsCount;
+
+  // Adjust domain scores and total score to 0-6 scale
+  for (let domain in domainScores) {
+    domainScores[domain] *= 1.2;
+  }
+
+  // Round domain scores and total score to two decimal places
+  for (let domain in domainScores) {
+    domainScores[domain] = Math.round(domainScores[domain] * 100) / 100;
+  }
+
+  return {
+    calculationId: 'ccq',
+    ccqDomainScore: domainScores,
+  };
+}
+
 function defaultScoring(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
@@ -514,14 +740,6 @@ function defaultScoring(userAnswers) {
 function displayResults(results) {
   console.log('Results', results);
 
-  // Clear previous results
-  // document.getElementById('auditScoreResult').innerHTML = '';
-  // document.getElementById('consumptionScoreResult').innerHTML = '';
-  // document.getElementById('dependenceScoreResult').innerHTML = '';
-  // document.getElementById('problemsScoreResult').innerHTML = '';
-  // document.getElementById('bmiResult').innerHTML = '';
-  // document.getElementById('totalScoreResult').innerHTML = '';
-  // document.getElementById('ageResult').innerHTML = '';
   if ('totalScore' in results) {
     document.getElementById('totalScoreResult').textContent =
       'Total Score: ' + results.totalScore;
@@ -550,7 +768,7 @@ function displayResults(results) {
       'BMI: ' + results.bmi + ' (' + results.category + ')';
   } else if (results.calculationId === 'bwcs') {
     document.getElementById('bwcsResult').textContent =
-      'BWCS Total Score: ' + results.totalScore;
+      'BWCS Total Score: ' + results.bwcstotalScore;
   } else if (results.calculationId === 'audit') {
     // Display AUDIT scores
     document.getElementById('auditScoreResult').textContent =
@@ -567,6 +785,9 @@ function displayResults(results) {
       'Total BDI Score: ' + results.bditotalScore;
     document.getElementById('bdiIIDepressionLevel').textContent =
       'Depression level: ' + results.depressionLevel;
+  } else if (results.calculationId === 'blcs') {
+    document.getElementById('blcsScoreResult').textContent =
+      'BLCS Total Score: ' + results.blcsTotalScore;
   } else if (results.calculationId === 'acro') {
     document.getElementById('acroglobalScoreResult').textContent =
       'Global Score: ' + results.acroglobalScore;
@@ -574,6 +795,53 @@ function displayResults(results) {
       'Physical Scale Score: ' + results.acrophysicalScaleScore;
     document.getElementById('acropsychologicalScaleScoreResult').textContent =
       'Psychological Scale Score: ' + results.acropsychologicalScaleScore;
+  } else if (results.calculationId === 'cade_q_sv') {
+    document.getElementById('cadeQSVScoreResult').textContent =
+      'CADE-Q SV Total Score: ' + results.cadetotalScore;
+  } else if (results.calculationId === 'caregiver_strain_index') {
+    document.getElementById('csiScoreResult').textContent =
+      'CSI Total Score: ' + results.csiTotalScore;
+  } else if (results.calculationId === 'cat') {
+    document.getElementById('catTotalScoreResult').textContent =
+      'CAT Total Score: ' + results.catTotalScore;
+    let healthImpact, recommendation;
+    if (results.catTotalScore <= 10) {
+      healthImpact = 'Low';
+      recommendation =
+        'Smoking cessation, preventive care, and reduced exposure to exacerbation risk factors; consider LAMA and rescue inhalers';
+    } else if (results.catTotalScore <= 20) {
+      healthImpact = 'Medium';
+      recommendation =
+        'Smoking cessation, preventive care, reduced exposure to exacerbation risk factors, and LAMA and rescue inhalers; consider ICS and/or LABA, referrals for pulmonary rehab, and possible lung transplant evaluation';
+    } else if (results.catTotalScore <= 30) {
+      healthImpact = 'High';
+      recommendation =
+        'Smoking cessation, preventive care, reduced exposure to exacerbation risk factors, ICS/LABA/LAMA therapy, referrals for pulmonary rehab, possible lung transplant evaluation, and O₂ supplementation';
+    } else {
+      healthImpact = 'Very High';
+      recommendation =
+        'Smoking cessation, preventive care, reduced exposure to exacerbation risk factors, ICS/LABA/LAMA therapy, referrals for pulmonary rehab, possible lung transplant evaluation, and O₂ supplementation';
+    }
+    document.getElementById('catHealthImpactResult').textContent =
+      'Health Impact: ' + healthImpact;
+    document.getElementById('catRecommendationResult').textContent =
+      'Recommendation: ' + recommendation;
+  } else if (results.calculationId === 'ccq') {
+    // // Adjust CCQ domain scores and total score to 0-6 scale
+    // for (let domain in results.ccqDomainScore) {
+    //   results.ccqDomainScore[domain] *= 1.2;
+    // }
+
+    document.getElementById('ccqSymptomsScoreResult').textContent =
+      'Symptoms Domain Score: ' + results.ccqDomainScore.Symptoms.toFixed(2);
+    document.getElementById('ccqFunctionalStateScoreResult').textContent =
+      'Functional State Domain Score: ' +
+      results.ccqDomainScore.FunctionalState.toFixed(2);
+    document.getElementById('ccqMentalStateScoreResult').textContent =
+      'Mental State Domain Score: ' +
+      results.ccqDomainScore.MentalState.toFixed(2);
+    document.getElementById('ccqTotalScoreResult').textContent =
+      'Total CCQ Score: ' + results.ccqDomainScore.TotalScore.toFixed(2);
   }
 }
 function calculateScaleScore(answers) {
