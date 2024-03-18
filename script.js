@@ -240,6 +240,8 @@ function processOutputs(calculationId, userAnswers) {
     results = scoreCAT(userAnswers);
   } else if (calculationId === 'ccq') {
     results = scoreCCQ(userAnswers);
+  } else if (calculationId === 'cdlqi') {
+    results = scoreCDLQI(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -598,87 +600,12 @@ function scoreCAT(userAnswers) {
     catTotalScore: totalScore,
   };
 }
-// function scoreCCQ(userAnswers) {
-//   const domainItems = {
-//     Symptoms: ['Q01', 'Q02', 'Q05', 'Q06'],
-//     FunctionalState: ['Q07', 'Q08', 'Q09', 'Q10'],
-//     MentalState: ['Q03', 'Q04'],
-//     TotalScore: [
-//       'Q01',
-//       'Q02',
-//       'Q03',
-//       'Q04',
-//       'Q05',
-//       'Q06',
-//       'Q07',
-//       'Q08',
-//       'Q09',
-//       'Q10',
-//     ],
-//   };
-
-//   let domainScores = {
-//     Symptoms: 0,
-//     FunctionalState: 0,
-//     MentalState: 0,
-//     TotalScore: 0,
-//   };
-
-//   let totalItemsCount = 0;
-
-//   for (let domain in domainItems) {
-//     let sum = 0;
-//     let itemCount = 0;
-
-//     domainItems[domain].forEach((item) => {
-//       let key = 'Q' + String(item).padStart(2, '0');
-//       let answerValue = userAnswers[key];
-//       if (answerValue === undefined) {
-//         answerValue = 0; // treat undefined answers as 0
-//       }
-//       sum += parseInt(answerValue);
-//       itemCount++;
-//     });
-
-//     if (itemCount >= (domain === 'MentalState' ? 2 : 3)) {
-//       domainScores[domain] = sum / itemCount;
-//     }
-
-//     totalItemsCount += itemCount;
-//     console.log(itemCount);
-//     domainScores['TotalScore'] += sum;
-//   }
-
-//   console.log(domainScores);
-//   if (totalItemsCount === 10) {
-//     domainScores['TotalScore'] /= totalItemsCount;
-//   } else {
-//     domainScores['TotalScore'] = undefined; // Or handle as needed
-//   }
-
-//   return {
-//     calculationId: 'ccq',
-//     ccqDomainScore: domainScores,
-//   };
-// }
 
 function scoreCCQ(userAnswers) {
   const domainItems = {
     Symptoms: ['Q01', 'Q02', 'Q05', 'Q06'],
     FunctionalState: ['Q07', 'Q08', 'Q09', 'Q10'],
     MentalState: ['Q03', 'Q04'],
-    // TotalScore: [
-    //   'Q01',
-    //   'Q02',
-    //   'Q03',
-    //   'Q04',
-    //   'Q05',
-    //   'Q06',
-    //   'Q07',
-    //   'Q08',
-    //   'Q09',
-    //   'Q10',
-    // ],
   };
 
   let domainScores = {
@@ -724,6 +651,53 @@ function scoreCCQ(userAnswers) {
   return {
     calculationId: 'ccq',
     ccqDomainScore: domainScores,
+  };
+}
+function scoreCDLQI(userAnswers) {
+  let totalScore = 0;
+  let sections = {
+    symptomsAndFeelings: 0,
+    leisure: 0,
+    schoolOrHolidays: 0,
+    personalRelationships: 0,
+    sleep: 0,
+    treatment: 0,
+  };
+
+  for (const [key, value] of Object.entries(userAnswers)) {
+    const questionNumber = parseInt(key.replace(/[^\d]/g, ''));
+    let score = parseInt(value, 10);
+
+    // Special handling for Question 7 (School or Holidays)
+    if (questionNumber === 7) {
+      score = Math.min(score, 3); // Ensure score doesn't exceed 3
+      sections.schoolOrHolidays = score;
+    } else {
+      // Sum the total score for other questions
+      totalScore += score;
+    }
+
+    // Add scores to respective sections (excluding special handling for Question 7)
+    if ([1, 2].includes(questionNumber)) {
+      sections.symptomsAndFeelings += score;
+    } else if ([4, 5, 6].includes(questionNumber)) {
+      sections.leisure += score;
+    } else if ([3, 8].includes(questionNumber)) {
+      sections.personalRelationships += score;
+    } else if (questionNumber === 9) {
+      sections.sleep += score;
+    } else if (questionNumber === 10) {
+      sections.treatment += score;
+    }
+  }
+
+  // Add the score of Question 7 to the total score separately
+  totalScore += sections.schoolOrHolidays;
+
+  return {
+    calculationId: 'cdlqi',
+    cdlqitotalScore: totalScore,
+    sections: sections,
   };
 }
 
@@ -827,11 +801,6 @@ function displayResults(results) {
     document.getElementById('catRecommendationResult').textContent =
       'Recommendation: ' + recommendation;
   } else if (results.calculationId === 'ccq') {
-    // // Adjust CCQ domain scores and total score to 0-6 scale
-    // for (let domain in results.ccqDomainScore) {
-    //   results.ccqDomainScore[domain] *= 1.2;
-    // }
-
     document.getElementById('ccqSymptomsScoreResult').textContent =
       'Symptoms Domain Score: ' + results.ccqDomainScore.Symptoms.toFixed(2);
     document.getElementById('ccqFunctionalStateScoreResult').textContent =
@@ -842,6 +811,30 @@ function displayResults(results) {
       results.ccqDomainScore.MentalState.toFixed(2);
     document.getElementById('ccqTotalScoreResult').textContent =
       'Total CCQ Score: ' + results.ccqDomainScore.TotalScore.toFixed(2);
+  } else if (results.calculationId === 'cdlqi') {
+    console.log('Displaying CDLQI results', results);
+    document.getElementById('cdlqiTotalScoreResult').textContent =
+      'CDLQI Total Score: ' + results.cdlqitotalScore;
+
+    document.getElementById('cdlqiSymptomsFeelingsScoreResult').textContent =
+      'Symptoms and Feelings Score: ' + results.sections.symptomsAndFeelings;
+
+    document.getElementById('cdlqiLeisureScoreResult').textContent =
+      'Leisure Score: ' + results.sections.leisure;
+
+    document.getElementById('cdlqiSchoolHolidaysScoreResult').textContent =
+      'School or Holidays Score: ' + results.sections.schoolOrHolidays;
+
+    document.getElementById(
+      'cdlqiPersonalRelationshipsScoreResult'
+    ).textContent =
+      'Personal Relationships Score: ' + results.sections.personalRelationships;
+
+    document.getElementById('cdlqiSleepScoreResult').textContent =
+      'Sleep Score: ' + results.sections.sleep;
+
+    document.getElementById('cdlqiTreatmentScoreResult').textContent =
+      'Treatment Score: ' + results.sections.treatment;
   }
 }
 function calculateScaleScore(answers) {
