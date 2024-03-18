@@ -244,6 +244,14 @@ function processOutputs(calculationId, userAnswers) {
     results = scoreCDLQI(userAnswers);
   } else if (calculationId === 'yp_core') {
     results = scoreYP_CORE(userAnswers);
+  } else if (calculationId === 'ten_meter_walk_test') {
+    // Extract trial times and convert them to numbers
+    const trialTimes = [
+      parseFloat(userAnswers.TRIAL_1),
+      parseFloat(userAnswers.TRIAL_2),
+      parseFloat(userAnswers.TRIAL_3),
+    ];
+    results = calculateTMWT(trialTimes);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -735,6 +743,22 @@ function scoreYP_CORE(userAnswers) {
   };
 }
 
+function calculateTMWT(trialTimes) {
+  const totalDistance = 10; // Distance covered in meters
+  const totalTrials = trialTimes.length;
+  const totalTimeInSeconds = trialTimes.reduce((acc, time) => acc + time, 0);
+  const meanTimeInSeconds = totalTimeInSeconds / totalTrials;
+  const meanInSecondsPerMeter = totalDistance / meanTimeInSeconds;
+  const meanInKilometersPerHour = meanInSecondsPerMeter * 3.6;
+
+  return {
+    calculationId: 'ten_meter_walk_test',
+    meanTimeInSeconds: meanTimeInSeconds.toFixed(2),
+    meanInSecondsPerMeter: meanInSecondsPerMeter.toFixed(2),
+    meanInKilometersPerHour: meanInKilometersPerHour.toFixed(2),
+  };
+}
+
 function categorizeDistress(score) {
   if (score <= 5) return 'Healthy';
   if (score <= 10) return 'Low';
@@ -884,6 +908,18 @@ function displayResults(results) {
 
     document.getElementById('ypCoreDistressCategoryResult').textContent =
       'Distress Category: ' + results.distressCategory;
+  } else if (results.calculationId === 'ten_meter_walk_test') {
+    console.log('Displaying results for:', results.calculationId);
+    console.log('Results:', results);
+
+    document.getElementById('tmwtMeanTimeInSecondsResult').textContent =
+      'Mean Time in Seconds: ' + results.meanTimeInSeconds;
+
+    document.getElementById('tmwtMeanInSecondsPerMeterResult').textContent =
+      'Mean in Seconds per Meter: ' + results.meanInSecondsPerMeter;
+
+    document.getElementById('tmwtMeanInKilometersPerHourResult').textContent =
+      'Mean in Kilometers per Hour: ' + results.meanInKilometersPerHour;
   }
 }
 function calculateScaleScore(answers) {
