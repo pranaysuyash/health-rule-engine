@@ -242,6 +242,8 @@ function processOutputs(calculationId, userAnswers) {
     results = scoreCCQ(userAnswers);
   } else if (calculationId === 'cdlqi') {
     results = scoreCDLQI(userAnswers);
+  } else if (calculationId === 'yp_core') {
+    results = scoreYP_CORE(userAnswers);
   } else {
     // Placeholder for other calculations
     outputDefinition.forEach((output) => {
@@ -701,6 +703,47 @@ function scoreCDLQI(userAnswers) {
   };
 }
 
+function scoreYP_CORE(userAnswers) {
+  let totalScore = 0;
+  let itemsAnswered = 0;
+
+  for (const [key, value] of Object.entries(userAnswers)) {
+    let score = parseInt(value, 10);
+    const questionNumber = parseInt(key.replace(/[^\d]/g, ''));
+
+    // Apply reverse scoring for items 3, 5, and 10
+    if ([3, 5, 10].includes(questionNumber)) {
+      score = 4 - score;
+    }
+
+    totalScore += score;
+    itemsAnswered++;
+  }
+
+  if (itemsAnswered > 0) {
+    // Calculate the average score and adjust to the scale of 0 to 40
+    totalScore = (totalScore / itemsAnswered) * 10;
+  }
+
+  // Categorize the level of distress
+  let distressCategory = categorizeDistress(totalScore);
+
+  return {
+    calculationId: 'yp_core',
+    yp_coretotalScore: totalScore.toFixed(1), // Round to one decimal place
+    distressCategory: distressCategory,
+  };
+}
+
+function categorizeDistress(score) {
+  if (score <= 5) return 'Healthy';
+  if (score <= 10) return 'Low';
+  if (score <= 14) return 'Mild';
+  if (score <= 19) return 'Moderate';
+  if (score <= 24) return 'Moderate-to-Severe';
+  return 'Severe';
+}
+
 function defaultScoring(userAnswers) {
   const answersArray = Object.keys(userAnswers).map((key) =>
     parseInt(userAnswers[key], 10)
@@ -835,6 +878,12 @@ function displayResults(results) {
 
     document.getElementById('cdlqiTreatmentScoreResult').textContent =
       'Treatment Score: ' + results.sections.treatment;
+  } else if (results.calculationId === 'yp_core') {
+    document.getElementById('ypCoreTotalScoreResult').textContent =
+      'YP-CORE Total Score: ' + results.yp_coretotalScore;
+
+    document.getElementById('ypCoreDistressCategoryResult').textContent =
+      'Distress Category: ' + results.distressCategory;
   }
 }
 function calculateScaleScore(answers) {
